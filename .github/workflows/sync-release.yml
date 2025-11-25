@@ -36,7 +36,7 @@ jobs:
 
       - name: Publish to My Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.API_TOKEN }}
           TZ: Asia/Shanghai # 设置时区以便显示正确日期
         run: |
           TAG_NAME="latest"
