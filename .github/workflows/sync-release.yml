@@ -1,0 +1,57 @@
+name: Mirror GeoLite to Release
+
+on:
+  # 每天 UTC 时间 03:00 (北京时间 11:00) 运行
+  schedule:
+    - cron: '0 3 * * *'
+  # 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  mirror-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 必须权限：允许创建和删除 Release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download files from Upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p downloads
+          
+          # 使用 pattern 一次性下载所有需要的 mmdb 文件
+          # P3TERX/GeoLite.mmdb 的 release 包含这三个文件，正好匹配 pattern
+          gh release download \
+            --repo P3TERX/GeoLite.mmdb \
+            --pattern "GeoLite2-*.mmdb" \
+            --dir downloads \
+            --clobber
+          
+          echo "Files downloaded:"
+          ls -lh downloads/
+
+      - name: Publish to My Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TZ: Asia/Shanghai # 设置时区以便显示正确日期
+        run: |
+          TAG_NAME="latest"
+          RELEASE_TITLE="GeoLite2 Database Mirror"
+          CURRENT_DATE=$(date +'%Y-%m-%d %H:%M:%S')
+          
+          # 1. 删除旧的 release 和 tag (如果存在)
+          # || true 表示如果删除失败(比如第一次运行不存在时)不要报错退出
+          gh release delete "$TAG_NAME" --yes --cleanup-tag || true
+          
+          # 2. 创建新的 Release 并上传文件
+          # --latest: 标记为最新版本
+          # --notes: Release 的说明文字
+          gh release create "$TAG_NAME" \
+            ./downloads/* \
+            --title "$RELEASE_TITLE" \
+            --notes "同步时间: $CURRENT_DATE (北京时间) <br/>源仓库: [P3TERX/GeoLite.mmdb](https://github.com/P3TERX/GeoLite.mmdb)" \
+            --latest
